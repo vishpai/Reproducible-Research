@@ -122,7 +122,7 @@ t1&lt;-totalactivity
 t1&lt;-cbind(state, mean, median)
 print(xtable(t1),type=&quot;html&quot; , include.rownames = FALSE)</code></pre>
 <!-- html table generated in R 3.1.2 by xtable 1.7-4 package -->
-<!-- Sat May 16 18:42:21 2015 -->
+<!-- Sat May 16 19:10:28 2015 -->
 <table border="1">
 <tr>
 <th>
@@ -173,7 +173,7 @@ y1&lt;-totalactivity
 y1&lt;-cbind(state, TotalRowCount, NARowCount)
 print(xtable(y1),type=&quot;html&quot; , include.rownames = TRUE)</code></pre>
 <!-- html table generated in R 3.1.2 by xtable 1.7-4 package -->
-<!-- Sat May 16 18:42:21 2015 -->
+<!-- Sat May 16 19:10:29 2015 -->
 <table border="1">
 <tr>
 <th>
@@ -203,9 +203,9 @@ before impution
 </td>
 </tr>
 </table>
-<p>Since strategy need not be sophisticated, I googled for variety of ways to impute the missing data and found VIM package. KNN function within VIM package helps in imputing the missing data using nearest neighbor averaging. I have picked nearest 1000 records and picked the median of those numbers</p>
+<p>Since strategy need not be sophisticated, I googled for variety of ways to impute the missing data and found <a href="http://cran.r-project.org/web/packages/VIM/index.html/">VIM</a> package. KNN function within <a href="http://cran.r-project.org/web/packages/VIM/index.html/">VIM</a> package helps in imputing the missing data using nearest neighbor averaging. I have picked nearest 1000 records and picked the median of those numbers</p>
 <pre class="r"><code>imputedactivity &lt;- kNN(activitystage,  k=1000, numFun=&quot;median&quot;)</code></pre>
-<pre><code>## Time difference of -3.175497 mins</code></pre>
+<pre><code>## Time difference of -3.101124 mins</code></pre>
 <p>calcualte the rows where steps data is missing after impution. As shown in the table below, after the impution/enrichment process, there are no rows with NA values in the steps field</p>
 <pre class="r"><code>TotalRowCount&lt;-nrow(imputedactivity)
 NARows&lt;- activitystage[is.na(imputedactivity$steps),]
@@ -216,7 +216,7 @@ y2&lt;-cbind(state, TotalRowCount, NARowCount)
 y&lt;-rbind(y1, y2)
 print(xtable(y),type=&quot;html&quot; , include.rownames = TRUE)</code></pre>
 <!-- html table generated in R 3.1.2 by xtable 1.7-4 package -->
-<!-- Sat May 16 18:45:32 2015 -->
+<!-- Sat May 16 19:13:35 2015 -->
 <table border="1">
 <tr>
 <th>
@@ -274,7 +274,7 @@ state&lt;-'after impution'
 t2&lt;-cbind(state, mean, median)
 print(xtable(t2), type = &quot;html&quot;, include.rownames = TRUE)  </code></pre>
 <!-- html table generated in R 3.1.2 by xtable 1.7-4 package -->
-<!-- Sat May 16 18:45:32 2015 -->
+<!-- Sat May 16 19:13:35 2015 -->
 <table border="1">
 <tr>
 <th>
@@ -308,7 +308,7 @@ after impution
 <pre class="r"><code>t&lt;-rbind(t1, t2)
 print(xtable(t), type = &quot;html&quot;, include.rownames = TRUE)  </code></pre>
 <!-- html table generated in R 3.1.2 by xtable 1.7-4 package -->
-<!-- Sat May 16 18:45:32 2015 -->
+<!-- Sat May 16 19:13:35 2015 -->
 <table border="1">
 <tr>
 <th>

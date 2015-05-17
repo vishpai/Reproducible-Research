@@ -74,7 +74,7 @@ print(xtable(t1),type="html" , include.rownames = FALSE)
 ```
 
 <!-- html table generated in R 3.1.2 by xtable 1.7-4 package -->
-<!-- Sat May 16 18:47:11 2015 -->
+<!-- Sat May 16 19:14:10 2015 -->
 <table border=1>
 <tr> <th> state </th> <th> mean </th> <th> median </th>  </tr>
   <tr> <td> before impution </td> <td> 10766.1886792453 </td> <td> 10765 </td> </tr>
@@ -128,13 +128,13 @@ print(xtable(y1),type="html" , include.rownames = TRUE)
 ```
 
 <!-- html table generated in R 3.1.2 by xtable 1.7-4 package -->
-<!-- Sat May 16 18:47:12 2015 -->
+<!-- Sat May 16 19:14:10 2015 -->
 <table border=1>
 <tr> <th>  </th> <th> state </th> <th> TotalRowCount </th> <th> NARowCount </th>  </tr>
   <tr> <td align="right"> 1 </td> <td> before impution </td> <td> 17568 </td> <td> 2304 </td> </tr>
    </table>
 
-Since strategy need not be sophisticated, I googled for variety of ways to impute the missing data and found VIM package. KNN function within VIM package helps in imputing the missing data using nearest neighbor averaging. I have picked nearest 1000 records and picked the median of those numbers  
+Since strategy need not be sophisticated, I googled for variety of ways to impute the missing data and found [VIM](http://cran.r-project.org/web/packages/VIM/index.html/) package. KNN function within [VIM](http://cran.r-project.org/web/packages/VIM/index.html/) package helps in imputing the missing data using nearest neighbor averaging. I have picked nearest 1000 records and picked the median of those numbers  
 
 
 ```r
@@ -142,7 +142,7 @@ imputedactivity <- kNN(activitystage,  k=1000, numFun="median")
 ```
 
 ```
-## Time difference of -3.204989 mins
+## Time difference of -3.261373 mins
 ```
 
 calcualte the rows where steps data is missing after impution.  As shown in the table below, after the impution/enrichment process, there are no rows with NA values in the steps field
@@ -159,7 +159,7 @@ print(xtable(y),type="html" , include.rownames = TRUE)
 ```
 
 <!-- html table generated in R 3.1.2 by xtable 1.7-4 package -->
-<!-- Sat May 16 18:50:24 2015 -->
+<!-- Sat May 16 19:17:26 2015 -->
 <table border=1>
 <tr> <th>  </th> <th> state </th> <th> TotalRowCount </th> <th> NARowCount </th>  </tr>
   <tr> <td align="right"> 1 </td> <td> before impution </td> <td> 17568 </td> <td> 2304 </td> </tr>
@@ -198,7 +198,7 @@ print(xtable(t2), type = "html", include.rownames = TRUE)
 ```
 
 <!-- html table generated in R 3.1.2 by xtable 1.7-4 package -->
-<!-- Sat May 16 18:50:24 2015 -->
+<!-- Sat May 16 19:17:26 2015 -->
 <table border=1>
 <tr> <th>  </th> <th> state </th> <th> mean </th> <th> median </th>  </tr>
   <tr> <td align="right"> 1 </td> <td> after impution </td> <td> 9460.06557377049 </td> <td> 10395 </td> </tr>
@@ -214,7 +214,7 @@ print(xtable(t), type = "html", include.rownames = TRUE)
 ```
 
 <!-- html table generated in R 3.1.2 by xtable 1.7-4 package -->
-<!-- Sat May 16 18:50:24 2015 -->
+<!-- Sat May 16 19:17:26 2015 -->
 <table border=1>
 <tr> <th>  </th> <th> state </th> <th> mean </th> <th> median </th>  </tr>
   <tr> <td align="right"> 1 </td> <td> before impution </td> <td> 10766.1886792453 </td> <td> 10765 </td> </tr>

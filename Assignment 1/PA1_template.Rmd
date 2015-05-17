@@ -105,7 +105,7 @@ y1<-cbind(state, TotalRowCount, NARowCount)
 print(xtable(y1),type="html" , include.rownames = TRUE)
 ```
 
-Since strategy need not be sophisticated, I googled for variety of ways to impute the missing data and found VIM package. KNN function within VIM package helps in imputing the missing data using nearest neighbor averaging. I have picked nearest 1000 records and picked the median of those numbers  
+Since strategy need not be sophisticated, I googled for variety of ways to impute the missing data and found [VIM](http://cran.r-project.org/web/packages/VIM/index.html/) package. KNN function within [VIM](http://cran.r-project.org/web/packages/VIM/index.html/) package helps in imputing the missing data using nearest neighbor averaging. I have picked nearest 1000 records and picked the median of those numbers  
 
 ```{r imputedactivity, echo=TRUE}
 imputedactivity <- kNN(activitystage,  k=1000, numFun="median")
