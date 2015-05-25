@@ -1,0 +1,451 @@
+---
+title: "Increase in Public Health and Economic impacts due to Severe Weather Events in United States"
+date: "Friday, May 22, 2015"
+
+---
+#Synopsis  
+
+In this report we aim to analyze the impacts of Storms and other severe weather events on both public health and economic problems for communities and municipalities.  Our overall hypothesis is that both Public Health and Economic impacts have increased over the period of time (there are few exceptions due to specific weather events in specific year).  Flood has been main cause of concern in US with respect to economic impacts while Public health (including fatalities and injuries) are greatly caused by tornedos. For the purpose of analysis, public data from U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database is used. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+#Loading and Processing the Raw Data
+
+```{r incluelibrary, echo=TRUE}
+#include necessary libraries
+library(xtable)
+library(ggplot2)
+library(plyr)
+library(lubridate)
+library(xtable)
+```
+
+Comma-separated-value file compressed via the bzip2 algorithm is downloaded from [U.S. National Oceanic and Atmospheric Administration's (NOAA)](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2) storm database.
+
+```{r filedownload, echo=TRUE}
+setInternet2(TRUE);
+
+filename <- "repdata_data_StormData.csv.bz2"
+
+if (!file.exists("repdata_data_StormData.csv.bz2")) {
+        fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+        download.file(fileUrl, destfile = "repdata_data_StormData.csv.bz2", mode = "wb")        
+        }
+d1 <- read.csv(bzfile(filename)) #read the .bz2 file directly using read.csv
+```
+
+```{r strdata, echo=TRUE}
+#obtain the structure of the data
+str(d1)
+
+#obtain distinct records per fields
+rapply(d1,function(x)length(unique(x)))
+```
+
+#Data Cleaning and Processing
+
+###Remove NA Data
+
+There are about 902297 records in the data set.  We need to inspect these records closely. There 37 data columns but we are interested in specific set of columns only. We will validate those columns for NA data using complete.cases(http://stat.ethz.ch/R-manual/R-patched/library/stats/html/complete.cases.html)  
+
+```{r checkdatacompleteness, echo=TRUE}
+#validate the data completeness for the subset of columns.  
+d2<-d1[complete.cases(d1[, c("BGN_DATE", "EVTYPE","FATALITIES","INJURIES","PROPDMG", "PROPDMGEXP", "CROPDMG","CROPDMGEXP","REFNUM")]),]
+nrow(d2)
+```
+
+As observed above there are no reduction in rows after checking for the completeness.  That means we have no NA data in any of the columns listed above
+
+```{r inspectdatatype, echo=TRUE}
+#inspect the data type of individual columns of the data frame
+sapply(d2, class)
+```
+
+###Correct the Data Type
+
+Notice that data types of Date and certain text columns/fields are set as factors. We need to change them to appropriate data types.  
+
+```{r changedatatype, echo=TRUE}
+#data type is changed for Date and Character fields of our interest
+d2$BGN_DATE=as.Date(d2$BGN_DATE, format = "%m/%d/%Y")
+d2$EVTYPE=as.character(d2$EVTYPE)
+d2$PROPDMGEXP=as.character(d2$PROPDMGEXP)
+d2$CROPDMGEXP=as.character(d2$CROPDMGEXP)
+```
+
+
+###Create small subset of data  
+
+Create the small data frame with columns that we are interested in. 
+
+```{r createsubsetd2, echo=TRUE}
+d3<-d2[c("BGN_DATE", "EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG" , "CROPDMGEXP", "REFNUM" )]
+head(d3)
+```
+
+Inspect Property and Crop Damage expense factor values. These are character fields denoting magnitude of the damage.  These columns are used in conjunction of PROPDMG and CROPDMG columns respectively to obtain the damage amounts
+
+```{r inspectmagnitudevalues, echo=TRUE}
+
+#list out unique value of Property Data Expense values
+unique(d3$PROPDMGEXP)
+#list out unique value of Crop Damage Expense values
+unique(d3$CROPDMGEXP)
+
+summary(d3$PROPDMGEXP)
+summary(d3$CROPDMGEXP)
+```
+
+###Translate Damaage Magnitude into Numbers  
+
+As per the documentation, [National Weather Service Storm Data](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf):  
+.k or K stands for damage in "thousands".  
+.m or M stands for damage in "millions"  
+.b or B stands for damage in "billions" 
+
+
+Note: h or H stands for "hundreds" but it has been eliminated from our analysis due to low economic impacts. 
+
+Other character magnitude values are not important from analysis point of view. We will limit our analysis to those records that have damage values either in thousands, millions or billions.
+
+We will create two numeric variables based on property and crop property damage magnitude values as follows. 
+
+```{r createnumericmagnitude, echo=TRUE}
+#we will assign NA to numeric magnitude factor if character magnitude is not in (k, K, m, M, b, B)
+d3=within(d3,{
+        prpfactor=NA
+        prpfactor[PROPDMGEXP %in% c('k','K')]=1000 #If property damage magnitude is k or K, property damage field PROPDMG will be multiplied by 1000 
+        prpfactor[PROPDMGEXP %in% c('m','M')]=1000000 #If propertydamage magnitude is m or M, property damage field PROPDMG will be multiplied by 1000000
+        prpfactor[PROPDMGEXP %in% c('b','B')]=1000000000 #If property damage magnitude is b or B, property damage field PROPDMG will be multiplied by 1000000000
+})
+
+d3=within(d3,{
+        crpfactor=NA
+        crpfactor[CROPDMGEXP %in% c('k','K')]=1000 #If crop damage magnitude is k or K, property damage field PROPDMG will be multiplied by 1000 
+        crpfactor[CROPDMGEXP %in% c('m','M')]=1000000 #If crop damage magnitude is m or M, property damage field PROPDMG will be multiplied by 1000000
+        crpfactor[CROPDMGEXP %in% c('b','B')]=1000000000 #If crop magnitude is b or B, property damage field PROPDMG will be multiplied by 1000000000
+})
+
+#check if numeric magnitude data is correctly assigned or not
+head(d3,2)
+tail(d3, 2)
+```
+
+Now, lets analyze the distinct event data as available in the data set.   
+
+```{r uniqueeventtype, echo=TRUE}
+unique(d3$EVTYPE)
+```
+
+
+###Categorize the Individual Weather Events  
+
+As observed above, Event Type has 985 distinct values which is way more than what is documented in the [National Weather Service Storm Data](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf).  We would need to group Event Types available in the data set by grouping the multipel Event Types together to futther analyze the weather event data set. 
+
+First step with process is limit the data set by eliminating those records which do not have valid property and crop damanage magnitude set. We will create the smaller subset by eliminating those rows that have magnitude data other than (k, K, m, M, b, B).  This will reduce the number of records that we have to analyze and investigate considerabley. 
+
+```{r createsubsetd4, echo=TRUE}
+d4<-d3[complete.cases(d3[, c("BGN_DATE", "EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "CROPDMG", "prpfactor","crpfactor","REFNUM" )]),]
+```
+
+
+We will create new column called "eventcategory" that will be used in later part of this analysis to group event types. 
+
+```{r addeventgroup, echo=TRUE}
+#while populating event group column, change the data to lower case. This will reduce the substituions in the later stage.
+d4$eventcategory<-tolower(d4$EVTYPE)
+```
+
+Let's explore into small data subset created in the previous steps
+
+```{r inspectsubsetd4, echo=TRUE}
+#obtain the structure of the small data set
+str(d4)
+
+#obtain the unique event type values
+unique(d4$EVTYPE)
+```
+
+As observed above, small subset of data has 279537 records. Distinct Event Types have reduced to 124 from 985.  Now, we need to club Event Types together.  
+
+We will review each Event Type values and categorize them into one of the bucket: Flood, Thunderstorm Wind, Hail Snow, Tornedo.  Event Type that fall into more than one Event Type are lumped under "Mix" category. All the other Event Types are categorized as "Other"
+
+Note: 
+We are setting the Event Category one by one. Pretty sure there may be better options avaiable to group more than one Event Types into Category. But with limited time avaiable to complete the assignment, we had to proceed with the below option. Appreiciate any feedback or comment in improving this piece of code.  
+
+```{r EventCategorization, echo=TRUE}
+#Categorize all Flood related events
+d4$eventcategory[d4$eventcategory=='flash flood']<-'Flood'
+d4$eventcategory[d4$eventcategory=='flash flooding']<-'Flood'
+d4$eventcategory[d4$eventcategory=='flooding']<-'Flood'
+d4$eventcategory[d4$eventcategory=='heavy rain']<-'Flood'
+d4$eventcategory[d4$eventcategory=='flood']<-'Flood'
+d4$eventcategory[d4$eventcategory=='river flood']<-'Flood'
+d4$eventcategory[d4$eventcategory=='flood/flash flood']<-'Flood'
+d4$eventcategory[d4$eventcategory=='urban flood']<-'Flood'
+d4$eventcategory[d4$eventcategory=='urban flooding']<-'Flood'
+d4$eventcategory[d4$eventcategory=='floods']<-'Flood'
+d4$eventcategory[d4$eventcategory=='coastal flooding']<-'Flood'
+d4$eventcategory[d4$eventcategory=='heavy rains/flooding']<-'Flood'
+d4$eventcategory[d4$eventcategory=='river flooding']<-'Flood'
+d4$eventcategory[d4$eventcategory=='flash flood/flood']<-'Flood'
+d4$eventcategory[d4$eventcategory=='flash flooding/flood']<-'Flood'
+d4$eventcategory[d4$eventcategory=='urban/sml stream fld']<-'Flood'
+d4$eventcategory[d4$eventcategory=='waterspout']<-'Flood'
+d4$eventcategory[d4$eventcategory=='heavy rain/high surf']<-'Flood'
+d4$eventcategory[d4$eventcategory=='river flooding']<-'Flood'
+d4$eventcategory[d4$eventcategory=='astronomical high tide']<-'Flood'
+d4$eventcategory[d4$eventcategory=='coastal flood']<-'Flood'
+d4$eventcategory[d4$eventcategory=='lakeshore flood']<-'Flood'
+
+
+#Categorize all Thunderstorm and Wind related events
+d4$eventcategory[d4$eventcategory=='hurricane opal/high winds']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='thunderstorm winds']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='hurricane erin']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='hurricane opal']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='thunderstorm wind']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='winter storm']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='high winds']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='winter storm high winds']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='winter storms']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='severe thunderstorms']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='severe thunderstorm winds']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='thunderstorms']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='tropical storm']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='tropical storm gordon']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='tropical storm jerry']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='thunderstorms winds']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='wind damage']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='high wind']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='tstm wind']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='thunderstorm winds lightning']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='ice storm']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='dust storm/high winds']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='hurricane felix']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='thuderstorm winds']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='winds']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='high winds/cold']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='thunderstorms wind']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='thunderstorm windss']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='tropical storm dean']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='hurricane']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='storm surge']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='typhoon']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='gusty winds']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='dust storm']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='strong wind']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='hurricane/typhoon']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='tropical depression']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='marine thunderstorm wind']<-'Thunderstorm Wind'
+d4$eventcategory[d4$eventcategory=='marine high wind']<-'Thunderstorm Wind'
+
+
+#Categorize all Hail and Snow related events
+d4$eventcategory[d4$eventcategory=='hail']<-'Hail Snow'
+d4$eventcategory[d4$eventcategory=='heavy snow']<-'Hail Snow'
+d4$eventcategory[d4$eventcategory=='blizzard']<-'Hail Snow'
+d4$eventcategory[d4$eventcategory=='glaze ice']<-'Hail Snow'
+d4$eventcategory[d4$eventcategory=='snow']<-'Hail Snow'
+d4$eventcategory[d4$eventcategory=='hail/winds']<-'Hail Snow'
+d4$eventcategory[d4$eventcategory=='hail/wind']<-'Hail Snow'
+d4$eventcategory[d4$eventcategory=='hail']<-'Hail Snow'
+d4$eventcategory[d4$eventcategory=='icy roads']<-'Hail Snow'
+d4$eventcategory[d4$eventcategory=='freeze']<-'Hail Snow'
+d4$eventcategory[d4$eventcategory=='small hail']<-'Hail Snow'
+d4$eventcategory[d4$eventcategory=='lake-effect snow']<-'Hail Snow'
+d4$eventcategory[d4$eventcategory=='marine hail']<-'Hail Snow'
+d4$eventcategory[d4$eventcategory=='hail 100']<-'Hail Snow'
+
+#Categorize all events that are mix of more than one event types
+d4$eventcategory[d4$eventcategory=='thunderstorm winds/hail']<-'Mix'
+d4$eventcategory[d4$eventcategory=='thunderstorm winds hail']<-'Mix'
+d4$eventcategory[d4$eventcategory=='high winds heavy rains']<-'Mix'
+d4$eventcategory[d4$eventcategory=='tornadoes, tstm wind, hail']<-'Mix'
+d4$eventcategory[d4$eventcategory=='heavy snow/high winds & flood']<-'Mix'
+d4$eventcategory[d4$eventcategory=='thunderstorm hail']<-'Mix'
+d4$eventcategory[d4$eventcategory=='thunderstorm winds/ flood']<-'Mix'
+d4$eventcategory[d4$eventcategory=='tstm wind/hail']<-'Mix'
+
+#Categorize all Tornado related events
+d4$eventcategory[d4$eventcategory=='tornado']<-'Tornado'
+d4$eventcategory[d4$eventcategory=='tornado f0']<-'Tornado'
+d4$eventcategory[d4$eventcategory=='cold air tornado']<-'Tornado'
+
+#Group rest of the events into Other category
+d4$eventcategory[d4$eventcategory=='lightning']<-'Other'
+d4$eventcategory[d4$eventcategory=='heat']<-'Other'
+d4$eventcategory[d4$eventcategory=='gustnado']<-'Other'
+d4$eventcategory[d4$eventcategory=='heavy rains']<-'Other'
+d4$eventcategory[d4$eventcategory=='ice jam flooding']<-'Other'
+d4$eventcategory[d4$eventcategory=='forest fires']<-'Other'
+d4$eventcategory[d4$eventcategory=='heat wave']<-'Other'
+d4$eventcategory[d4$eventcategory=='drought']<-'Other'
+d4$eventcategory[d4$eventcategory=='heat wave drought']<-'Other'
+d4$eventcategory[d4$eventcategory=='wild/forest fire']<-'Other'
+d4$eventcategory[d4$eventcategory=='wild/forest fires']<-'Other'
+d4$eventcategory[d4$eventcategory=='wildfires']<-'Other'
+d4$eventcategory[d4$eventcategory=='funnel cloud']<-'Other'
+d4$eventcategory[d4$eventcategory=='extreme cold']<-'Other'
+d4$eventcategory[d4$eventcategory=='excessive heat']<-'Other'
+d4$eventcategory[d4$eventcategory=='frost/freeze']<-'Other'
+d4$eventcategory[d4$eventcategory=='fog']<-'Other'
+d4$eventcategory[d4$eventcategory=='dry microburst']<-'Other'
+d4$eventcategory[d4$eventcategory=='landslide']<-'Other'
+d4$eventcategory[d4$eventcategory=='extreme cold/wind chill']<-'Other'
+d4$eventcategory[d4$eventcategory=='wildfire']<-'Other'
+d4$eventcategory[d4$eventcategory=='heavy surf/high surf']<-'Other'
+d4$eventcategory[d4$eventcategory=='rip current']<-'Other'
+d4$eventcategory[d4$eventcategory=='dense fog']<-'Other'
+d4$eventcategory[d4$eventcategory=='frost/freeze']<-'Other'
+d4$eventcategory[d4$eventcategory=='winter weather']<-'Other'
+d4$eventcategory[d4$eventcategory=='high surf']<-'Other'
+d4$eventcategory[d4$eventcategory=='cold/wind chill']<-'Other'
+d4$eventcategory[d4$eventcategory=='tsunami']<-'Other'
+d4$eventcategory[d4$eventcategory=='avalanche']<-'Other'
+d4$eventcategory[d4$eventcategory=='sleet']<-'Other'
+d4$eventcategory[d4$eventcategory=='storm surge/tide']<-'Other'
+d4$eventcategory[d4$eventcategory=='freezing fog']<-'Other'
+d4$eventcategory[d4$eventcategory=='seiche']<-'Other'
+d4$eventcategory[d4$eventcategory=='marine strong wind']<-'Other'
+d4$eventcategory[d4$eventcategory=='dust devil']<-'Other'
+d4$eventcategory[d4$eventcategory=='astronomical low tide']<-'Other'
+d4$eventcategory[d4$eventcategory=='dense smoke']<-'Other'
+d4$eventcategory[d4$eventcategory=='volcanic ashfall']<-'Other'
+
+#obtain distinct records per fields in the smaller dataset
+rapply(d4,function(x)length(unique(x)))
+
+#now lists out distinct values of Event Category
+unique(d4$eventcategory)
+```
+
+Extract Year from Begin Date column as a separate column. We will use this data in YoY analysis in the later phase of the work. We will also calculate the total of public health and economic impacts as below:
+.Total Public Health Impact = Fatalities + Injuris
+.Total Economic Damage = ( Property Damage * Property Damage Magnitude/Factor+ Crop Damage * Crop Damage Magnitude/Factor
+
+```{r pubhealth&ecodamage, echo=TRUE}
+#introduce new column Year based on Event Begin Date
+d4$year<-year(d4$BGN_DATE)
+#Total Public Health Impact calculation
+d4$phi<-d4$FATALITIES + d4$INJURIES
+#Total Economic Damage calculation
+d4$ei<-(d4$PROPDMG * d4$prpfactor) + (d4$CROPDMG * d4$crpfactor)
+
+#check top 2 rows to validate the calculation
+head(d4, 2)
+
+#check bottom 2 rows to validate the calculation
+tail(d4, 2)
+
+```
+
+#Analysis and Results  
+This section of the document details about the analyis of the data and results identified there by. 
+
+
+##Public Health Impact Analysis
+Let's analyze Public Health impact due to severe weather conditions.  Based on the below data, we see that 1998 and 2011 have comparitively high public health impact (fatality and injury) compared other years.
+
+```{r intialphdataanalysis, echo=TRUE}
+
+colnames(d4)
+
+#Population Health impact by year across the categories
+phibyyear <- tapply (d4$phi, d4$year, sum)
+phibyyear
+
+```
+
+We further analyzed the data for 1998 and 2011 to find out Category of event that caused the Health impact. Based on the investigation below, in 1998, Flood resulted in severe public health impact while Tornado caused impacts in 2011.
+
+```{r detailedphdataanalysis, echo=TRUE}
+#Drill down into population Health impact in 1998 and 2011 to find out categories that caused impact
+d4.1998 <- subset(d4, subset=(year == "1998" ))
+
+phiimpact1998 <- tapply (d4.1998$phi, d4.1998$eventcategory, sum)
+d4.2011 <- subset(d4, subset=(year == "2011" ))
+phiimpact2011 <- tapply (d4.2011$phi, d4.2011$eventcategory, sum)
+
+phiimpact1998
+phiimpact2011
+
+#Population Health impact by Category across the years
+eibycategory <- tapply (d4$ei, d4$eventcategory, sum)
+eibycategory
+
+```
+
+##Economic Impact Analysis
+We will now analyze the economic impacts in US due to severe weather conditions. Let's determine the yearly damage due to weather conditions.  
+
+Based on the discovery below, in year 2006, US economy suffered huge damages due to weather conditions compared other years. Flood is the major cause of weather condition that resulted in huge damages.  
+
+```{r detailedecodataanalysis, echo=TRUE}
+#Economic impacts by Year across the Categories
+eibyyear <- tapply (d4$ei, list(d4$year), sum) 
+eibyyear
+
+#Economic impacts by Categories across the year
+eibycaegory <- tapply (d4$ei, list(d4$eventcategory), sum)
+eibycaegory
+```
+
+##Exploratory Data Analysis
+We will perform some exploratory data analysis to further analyze the observations from the previous sections. Exploratory analysis helps paint the graphical picture of the data analysis.  
+
+###Periodic Economic Impacts 
+In the below plot, we would show the economic impact (including property and crop damage) across year due weather conditions. As observed previously, graph clearly shows that year 2006 highest impactufl year in terms of damages.  
+
+```{r ecobyyear, echo=TRUE}
+ecobyyear<-aggregate(d4$ei, by = list(d4$year), sum)
+opar<-par(no.readonly=TRUE)
+par(mfrow=c(1,1))
+#Plot the various graphs in various regions of the output file
+plot(ecobyyear$Group.1,ecobyyear$x/1000000000, type="l", #line chart is plotted,
+     lwd = 2, #set the width of line chart
+     xlab=expression(bold("Year")) , # Y axis label
+     ylab=expression(bold("Economic Impact (in billion $")),  # Y axis label
+     main="Economic Impact by Year", col = "blue")        # Title of the graph
+```
+
+###Economic Impact by Event Category
+Below plot shows the economic impacts (consisting both property and crop) by various weather event categories.  As identified previously, Flood is the major cause of the economic damages in US in the recent several years followed by Tornado. 
+
+```{r ecobycategory, echo=TRUE}
+ecoimpbyevent<-aggregate((d4$ei)/1000000000, by = list(Category= d4$eventcategory, Year= d4$year), FUN=sum)
+
+g<-ggplot(ecoimpbyevent, aes(x=Year, y=x, color=Category)) 
+g<-g+geom_point(alpha=.3) #add layers to plot
+g<-g+geom_smooth(alpha=.2, size=1,,  method="loess") #add smooth
+g<-g+ggtitle('Economic Impact by Year by Category') #set the plot title
+g<-g+xlab("Year") #set the x axis title
+g<-g+ylab("Economic Impact (in billion $)")  #set the y axis title
+g<-g+theme(plot.title = element_text(size = rel(1.25), colour = "blue", face ="bold" )) #set font, color of plot title
+g<-g+theme(axis.title.x = element_text(size = rel(1), colour = "black", face ="bold" )) #set font, color of x axis
+g<-g+theme(axis.title.y = element_text(size = rel(1), colour = "black", face ="bold" )) #set font, color of y axis
+g<-g+theme(axis.text.x = element_text(size = rel(1), colour = "black", face ="bold" ))#set font, color of x axis text
+g<-g+theme(axis.text.y = element_text(size = rel(1), colour = "black", face ="bold" ))#set font, color of y axis text
+
+print(g)
+```
+
+###Public Health impacts by Event Category
+Below plot shows the public health impacts (consisting both fatalities and injuries) by various weather event categories.  As identified previously, Tornedo related health concerns are on the rise in US in the recent years overtaking Flood.  
+  
+```{r phibycategory, echo=TRUE}
+pophealthbyevent<-aggregate((d4$phi), by = list(Category= d4$eventcategory, Year= d4$year), FUN=sum)
+
+g<-ggplot(pophealthbyevent, aes(x=Year, y=x, color=Category)) 
+g<-g+geom_point(alpha=.3) #add layers to plot
+g<-g+geom_smooth(alpha=.2, size=1,,  method="loess") #add smooth
+g<-g+ggtitle('Population Health Impact by Year by Category') #set the plot title
+g<-g+xlab("Year") #set the x axis title
+g<-g+ylab("Population Health Impact (Fataliteis & Injuries)")  #set the y axis title
+g<-g+theme(plot.title = element_text(size = rel(1.25), colour = "blue", face ="bold" )) #set font, color of plot title
+g<-g+theme(axis.title.x = element_text(size = rel(1), colour = "black", face ="bold" )) #set font, color of x axis
+g<-g+theme(axis.title.y = element_text(size = rel(1), colour = "black", face ="bold" )) #set font, color of y axis
+g<-g+theme(axis.text.x = element_text(size = rel(1), colour = "black", face ="bold" ))#set font, color of x axis text
+g<-g+theme(axis.text.y = element_text(size = rel(1), colour = "black", face ="bold" ))#set font, color of y axis text
+
+
+print(g)
+```
